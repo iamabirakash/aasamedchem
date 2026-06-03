@@ -1,14 +1,15 @@
 # AasaMedChem Inventory & Quotation System
 
-A small hackathon-style inventory and order management app built with Next.js, Neon PostgreSQL, and Vercel deployment in mind.
+A small inventory, seller listing, buyer ordering, and admin oversight app built with Next.js, Neon PostgreSQL, and Vercel deployment in mind.
 
 ## Features
 
-- Role-based authentication for `admin` and `seller`.
-- Admin inventory panel for creating/deactivating products, setting stock, and configuring per-base-unit INR prices.
-- Seller product search/filter page with multi-product quotation placement.
-- Flexible order quantities in `g`, `kg`, `mL`, `L`, and `unit`.
-- Admin order review showing requested units, normalized base quantities, per-base prices, and totals.
+- Role-based authentication for `buyer`, `seller`, and `admin`.
+- Buyer panel to search/filter products and place quotations/orders from sellers.
+- Seller panel to list products with name, SKU, quantity, unit dimension, stock, and INR pricing.
+- Seller sales panel to view buyer requests for their own products.
+- Admin panel to search all products/sellers, create listings for any seller, edit/deactivate listings, and view all orders.
+- Flexible quantities in `g`, `kg`, `mL`, `L`, and `unit`.
 - Signed HTTP-only session cookie and PBKDF2 password hashes.
 
 ## Tech Stack & Design
@@ -16,22 +17,21 @@ A small hackathon-style inventory and order management app built with Next.js, N
 - **Frontend/backend:** Next.js App Router with React Server Components and Server Actions.
 - **Database:** Neon-hosted PostgreSQL via `@neondatabase/serverless`.
 - **Auth:** Email/password login, PBKDF2 password hashes, signed cookie sessions.
-- **Deployment:** Vercel, with `DATABASE_URL` and `AUTH_SECRET` configured as environment variables.
+- **Deployment:** Vercel with `DATABASE_URL` and `AUTH_SECRET` environment variables.
 
-The frontend calls Server Actions for login, product management, order placement, and status updates. Those actions validate roles, normalize units, calculate prices, and persist data in PostgreSQL.
+Server Actions validate roles, normalize units, calculate prices, and persist orders/listings in PostgreSQL.
 
 ## Database Schema
-
-Core tables are created automatically by `ensureSchema()` and can also be initialized with `npm run db:seed`.
 
 - `users`
   - `id UUID PRIMARY KEY`
   - `name TEXT`
   - `email TEXT UNIQUE`
-  - `role TEXT CHECK ('admin', 'seller')`
+  - `role TEXT CHECK ('admin', 'seller', 'buyer')`
   - `password_hash TEXT`
 - `products`
   - `id UUID PRIMARY KEY`
+  - `seller_id UUID REFERENCES users(id)`
   - `sku TEXT UNIQUE`
   - `name TEXT`
   - `category TEXT`
@@ -43,11 +43,12 @@ Core tables are created automatically by `ensureSchema()` and can also be initia
   - `is_active BOOLEAN`
 - `orders`
   - `id UUID PRIMARY KEY`
-  - `user_id UUID REFERENCES users(id)`
+  - `user_id UUID REFERENCES users(id)` as the buyer
   - `status TEXT CHECK ('pending', 'approved', 'rejected', 'fulfilled')`
   - `total_inr NUMERIC(30,12)`
   - `notes TEXT`
 - `order_items`
+  - `product_id UUID REFERENCES products(id)`
   - `requested_qty NUMERIC(30,12)`
   - `requested_unit TEXT CHECK ('g', 'kg', 'mL', 'L', 'unit')`
   - `base_qty NUMERIC(30,12)`
@@ -55,17 +56,17 @@ Core tables are created automatically by `ensureSchema()` and can also be initia
   - `unit_price_inr NUMERIC(30,12)`
   - `line_total_inr NUMERIC(30,12)`
 
-`NUMERIC(30,12)` was chosen for quantities and prices because chemical inventory can require very small fractional rates as well as very large stock or quotation values. It avoids floating-point storage errors and keeps 12 decimal places for conversion-sensitive calculations.
+`NUMERIC(30,12)` is used for quantities and prices to support large values and high decimal precision without floating-point storage errors.
 
 ## Unit Storage & Conversion Strategy
 
 Internal storage uses one base unit per dimension:
 
-- **Weight:** stored in grams (`g`)
-- **Volume:** stored in milliliters (`mL`)
-- **Count:** stored in items (`unit`)
+- **Weight:** grams (`g`)
+- **Volume:** milliliters (`mL`)
+- **Count:** items (`unit`)
 
-Supported conversion factors:
+Conversion factors:
 
 - `1 kg = 1000 g`
 - `1 L = 1000 mL`
@@ -73,79 +74,63 @@ Supported conversion factors:
 
 Prices are stored as INR per base unit:
 
-- Weight products store price per `g`.
-- Volume products store price per `mL`.
-- Count products store price per `unit`.
+- Weight products: price per `g`
+- Volume products: price per `mL`
+- Count products: price per `unit`
 
-Conversions are applied in `app/actions.ts` before saving order items:
+Conversions happen in `app/actions.ts` during order placement:
 
-1. Seller enters `requested_qty` and `requested_unit`.
-2. Code validates that the unit matches the product dimension.
-3. Requested quantity is converted to `base_qty`.
+1. Buyer enters `requested_qty` and `requested_unit`.
+2. The action validates the unit against the product dimension.
+3. Quantity converts to `base_qty`.
 4. `line_total_inr = base_qty * price_per_base_unit_inr`.
-5. Both requested and base values are stored, so admins can audit the conversion.
-
-Decimal parsing and multiplication use scaled `BigInt` helpers in `lib/decimal.ts` before values are written to PostgreSQL `NUMERIC` columns.
+5. Requested and base values are both stored for seller/admin audit.
 
 ## Local Setup
 
-1. Install dependencies:
+```bash
+npm install
+copy .env.example .env
+npm run db:seed
+npm run dev
+```
 
-   ```bash
-   npm install
-   ```
+Before `npm run db:seed`, put your Neon connection string and secret in `.env`:
 
-2. Create `.env`:
+```env
+DATABASE_URL="postgresql://user:password@host.neon.tech/dbname?sslmode=require"
+AUTH_SECRET="a-long-random-secret"
+```
 
-   ```bash
-   cp .env.example .env
-   ```
-
-3. Add your Neon pooled or direct connection string:
-
-   ```env
-   DATABASE_URL="postgresql://user:password@host.neon.tech/dbname?sslmode=require"
-   AUTH_SECRET="a-long-random-secret"
-   ```
-
-4. Initialize schema and demo records:
-
-   ```bash
-   npm run db:seed
-   ```
-
-5. Run locally:
-
-   ```bash
-   npm run dev
-   ```
+Open `http://localhost:3000`.
 
 ## Demo Credentials
 
 - Admin: `admin@aasamedchem.test` / `Admin@123`
 - Seller: `seller@aasamedchem.test` / `Seller@123`
+- Buyer: `buyer@aasamedchem.test` / `Buyer@123`
 
-## Using the App
+## Role Flows
 
-- **Seller flow:** Login as seller, open Products, search/filter, select one or more products, enter compatible quantities/units, and place a quotation.
-- **Admin inventory:** Login as admin, create products with base stock and base-unit INR price, and deactivate products as needed.
-- **Admin order review:** Open Admin Orders to see requested units, normalized base quantities, rates, totals, notes, and status controls.
+- **Buyer:** Login, open Products, search/filter products, choose quantities/units, and place a quotation/order.
+- **Seller:** Login, open My Listings, create product listings, manage active stock, and view sales requests.
+- **Admin:** Login, search all products/sellers, create or edit any seller listing, deactivate listings, and review all orders/statuses.
 
 Example: ordering `2 kg` of a weight product converts to `2000 g`; if the product rate is `₹0.85/g`, the line total is `₹1,700.00`.
 
 ## Vercel Deployment
 
-1. Push the repository to GitHub with meaningful incremental commits.
+1. Push the repository to GitHub.
 2. Import the repository in Vercel.
-3. Set environment variables in Vercel Project Settings:
+3. Add environment variables:
    - `DATABASE_URL`
    - `AUTH_SECRET`
 4. Deploy.
-5. After deployment, visit the live URL once or run `npm run db:seed` locally against the same Neon database to ensure the schema and demo users exist.
+5. Run `npm run db:seed` locally against the same Neon database, or visit the deployed app once to let schema initialization run.
 
 ## Live URL
 
-Add your deployed Vercel URL here after deployment:
+Add your deployed Vercel URL here:
 
 ```text
 https://your-project.vercel.app
