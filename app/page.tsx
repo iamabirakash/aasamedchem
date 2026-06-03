@@ -14,7 +14,7 @@ export default async function HomePage() {
           every conversion against stored base quantities.
         </p>
         <div className="row-actions">
-          <Link className="button" href={user ? (user.role === "admin" ? "/admin" : "/products") : "/login"}>
+          <Link className="button" href={user ? (user.role === "admin" ? "/admin" : user.role === "seller" ? "/seller" : "/products") : "/login"}>
             Open dashboard
           </Link>
           <Link className="button ghost" href="/login">

@@ -5,7 +5,7 @@ import { ensureSchema, sql } from "@/lib/db";
 import { formatInr } from "@/lib/units";
 
 export default async function OrdersPage() {
-  const user = await requireUser("seller");
+  const user = await requireUser("buyer");
   await ensureSchema();
   const orders: Array<Record<string, any>> = await sql`
     SELECT id, status, total_inr, notes, created_at

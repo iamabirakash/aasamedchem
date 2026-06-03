@@ -19,7 +19,7 @@ export async function loginAction(formData: FormData) {
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
   const user = await login(email, password);
-  redirect(user.role === "admin" ? "/admin" : "/products");
+  redirect(user.role === "admin" ? "/admin" : user.role === "seller" ? "/seller" : "/products");
 }
 
 export async function logoutAction() {
@@ -28,10 +28,14 @@ export async function logoutAction() {
 }
 
 export async function saveProductAction(formData: FormData) {
-  await requireUser("admin");
+  const user = await requireUser();
   await ensureSchema();
+  if (!["admin", "seller"].includes(user.role)) {
+    throw new Error("Only sellers and admins can save products");
+  }
 
   const id = String(formData.get("id") ?? "");
+  const sellerId = user.role === "admin" ? String(formData.get("seller_id") ?? user.id) : user.id;
   const dimension = String(formData.get("dimension") ?? "count") as Dimension;
   const inventoryBaseQty = parseDecimalToScaled(formData.get("inventory_base_qty") ?? "0");
   const pricePerBase = parseDecimalToScaled(formData.get("price_per_base_unit_inr") ?? "0");
@@ -66,27 +70,39 @@ export async function saveProductAction(formData: FormData) {
           inventory_base_qty = ${values.inventory},
           price_per_base_unit_inr = ${values.price},
           is_active = ${values.isActive},
+          seller_id = ${sellerId},
           updated_at = now()
       WHERE id = ${id}
+        AND (${user.role} = 'admin' OR seller_id = ${user.id})
     `;
   } else {
     await sql`
-      INSERT INTO products (sku, name, category, description, dimension, base_unit, inventory_base_qty, price_per_base_unit_inr, is_active)
-      VALUES (${values.sku}, ${values.name}, ${values.category}, ${values.description}, ${values.dimension}, ${values.baseUnit}, ${values.inventory}, ${values.price}, ${values.isActive})
+      INSERT INTO products (seller_id, sku, name, category, description, dimension, base_unit, inventory_base_qty, price_per_base_unit_inr, is_active)
+      VALUES (${sellerId}, ${values.sku}, ${values.name}, ${values.category}, ${values.description}, ${values.dimension}, ${values.baseUnit}, ${values.inventory}, ${values.price}, ${values.isActive})
     `;
   }
 
   revalidatePath("/admin");
+  revalidatePath("/seller");
   revalidatePath("/products");
-  redirect("/admin");
+  redirect(user.role === "admin" ? "/admin" : "/seller");
 }
 
 export async function deleteProductAction(formData: FormData) {
-  await requireUser("admin");
+  const user = await requireUser();
   await ensureSchema();
+  if (!["admin", "seller"].includes(user.role)) {
+    throw new Error("Only sellers and admins can deactivate products");
+  }
   const id = String(formData.get("id") ?? "");
-  await sql`UPDATE products SET is_active = false, updated_at = now() WHERE id = ${id}`;
+  await sql`
+    UPDATE products
+    SET is_active = false, updated_at = now()
+    WHERE id = ${id}
+      AND (${user.role} = 'admin' OR seller_id = ${user.id})
+  `;
   revalidatePath("/admin");
+  revalidatePath("/seller");
 }
 
 export async function updateOrderStatusAction(formData: FormData) {
@@ -97,7 +113,7 @@ export async function updateOrderStatusAction(formData: FormData) {
 }
 
 export async function placeOrderAction(formData: FormData) {
-  const user = await requireUser("seller");
+  const user = await requireUser("buyer");
   await ensureSchema();
 
   const selectedIds = formData.getAll("product_id").map(String);
@@ -113,7 +129,7 @@ export async function placeOrderAction(formData: FormData) {
     if (!isPositive(quantity)) continue;
 
     const products = await sql`
-      SELECT id, sku, name, dimension, base_unit, inventory_base_qty, price_per_base_unit_inr
+      SELECT id, seller_id, sku, name, dimension, base_unit, inventory_base_qty, price_per_base_unit_inr
       FROM products
       WHERE id = ${productId} AND is_active = true
       LIMIT 1
@@ -163,5 +179,6 @@ export async function placeOrderAction(formData: FormData) {
 
   revalidatePath("/orders");
   revalidatePath("/admin/orders");
+  revalidatePath("/seller/orders");
   redirect(`/orders/${orderId}`);
 }

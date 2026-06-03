@@ -7,19 +7,20 @@ import { formatDecimal, formatInr, unitsForDimension, type Dimension } from "@/l
 type SearchParams = Promise<{ q?: string; category?: string }>;
 
 export default async function ProductsPage({ searchParams }: { searchParams: SearchParams }) {
-  const user = await requireUser("seller");
+  const user = await requireUser("buyer");
   await ensureSchema();
   const params = await searchParams;
   const q = params.q ?? "";
   const category = params.category ?? "";
 
   const products: Array<Record<string, any>> = await sql`
-    SELECT *
-    FROM products
-    WHERE is_active = true
-      AND (${q} = '' OR name ILIKE ${`%${q}%`} OR sku ILIKE ${`%${q}%`} OR category ILIKE ${`%${q}%`})
-      AND (${category} = '' OR category = ${category})
-    ORDER BY category, name
+    SELECT p.*, u.name AS seller_name
+    FROM products p
+    LEFT JOIN users u ON u.id = p.seller_id
+    WHERE p.is_active = true
+      AND (${q} = '' OR p.name ILIKE ${`%${q}%`} OR p.sku ILIKE ${`%${q}%`} OR p.category ILIKE ${`%${q}%`} OR u.name ILIKE ${`%${q}%`})
+      AND (${category} = '' OR p.category = ${category})
+    ORDER BY p.category, p.name
   `;
   const categories: Array<Record<string, any>> = await sql`SELECT DISTINCT category FROM products WHERE is_active = true ORDER BY category`;
 
@@ -27,8 +28,8 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
     <main className="shell">
       <Nav user={user} />
       <section className="hero">
-        <span className="pill">Seller panel</span>
-        <h1>Build a quotation across mixed units.</h1>
+        <span className="pill">Buyer panel</span>
+        <h1>Search products and buy from sellers.</h1>
         <p>
           Select products, enter quantities in compatible units, and submit. Each line stores both requested
           units and normalized base quantities.
@@ -65,7 +66,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
                 <span className="pill">{product.category}</span>
                 <h3>{product.name}</h3>
                 <p className="muted">
-                  {product.sku} · Stock {formatDecimal(product.inventory_base_qty)} {product.base_unit} · Rate{" "}
+                  Seller {product.seller_name ?? "Unassigned"} · {product.sku} · Stock {formatDecimal(product.inventory_base_qty)} {product.base_unit} · Rate{" "}
                   {formatInr(product.price_per_base_unit_inr)} / {product.base_unit}
                 </p>
                 <p className="muted">{product.description}</p>

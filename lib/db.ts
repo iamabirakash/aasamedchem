@@ -35,15 +35,19 @@ export async function ensureSchema() {
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       name TEXT NOT NULL,
       email TEXT NOT NULL UNIQUE,
-      role TEXT NOT NULL CHECK (role IN ('admin', 'seller')),
+      role TEXT NOT NULL CHECK (role IN ('admin', 'seller', 'buyer')),
       password_hash TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `;
 
+  await sql`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check`;
+  await sql`ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('admin', 'seller', 'buyer'))`;
+
   await sql`
     CREATE TABLE IF NOT EXISTS products (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      seller_id UUID REFERENCES users(id),
       sku TEXT NOT NULL UNIQUE,
       name TEXT NOT NULL,
       category TEXT NOT NULL,
@@ -57,6 +61,8 @@ export async function ensureSchema() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `;
+
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS seller_id UUID REFERENCES users(id)`;
 
   await sql`
     CREATE TABLE IF NOT EXISTS orders (
@@ -96,19 +102,33 @@ async function seedIfEmpty() {
       INSERT INTO users (name, email, role, password_hash)
       VALUES
       ('Aasa Admin', 'admin@aasamedchem.test', 'admin', ${hashPassword("Admin@123")}),
-      ('Seller Demo', 'seller@aasamedchem.test', 'seller', ${hashPassword("Seller@123")})
+      ('Seller Demo', 'seller@aasamedchem.test', 'seller', ${hashPassword("Seller@123")}),
+      ('Buyer Demo', 'buyer@aasamedchem.test', 'buyer', ${hashPassword("Buyer@123")})
     `;
   }
 
+  await sql`
+    INSERT INTO users (name, email, role, password_hash)
+    VALUES ('Buyer Demo', 'buyer@aasamedchem.test', 'buyer', ${hashPassword("Buyer@123")})
+    ON CONFLICT (email) DO NOTHING
+  `;
+
+  const sellers = await sql`SELECT id FROM users WHERE role = 'seller' ORDER BY created_at LIMIT 1`;
+  const sellerId = sellers[0]?.id;
+
   const products = await sql`SELECT COUNT(*)::int AS count FROM products`;
-  if (products[0].count === 0) {
+  if (products[0].count === 0 && sellerId) {
     await sql`
-      INSERT INTO products (sku, name, category, description, dimension, base_unit, inventory_base_qty, price_per_base_unit_inr)
+      INSERT INTO products (seller_id, sku, name, category, description, dimension, base_unit, inventory_base_qty, price_per_base_unit_inr)
       VALUES
-      ('CHEM-NA-001', 'Sodium Chloride AR', 'Reagents', 'Analytical reagent grade sodium chloride.', 'weight', 'g', 250000.000000000000, 0.850000000000),
-      ('SOL-ETH-001', 'Ethanol 99.9%', 'Solvents', 'High purity ethanol for lab usage.', 'volume', 'mL', 500000.000000000000, 1.250000000000),
-      ('KIT-PIP-010', 'Sterile Pipette Tips', 'Consumables', 'Box of sterile universal pipette tips.', 'count', 'unit', 10000.000000000000, 2.750000000000),
-      ('CHEM-KI-001', 'Potassium Iodide', 'Reagents', 'Pharma-grade potassium iodide powder.', 'weight', 'g', 75000.000000000000, 4.650000000000)
+      (${sellerId}, 'CHEM-NA-001', 'Sodium Chloride AR', 'Reagents', 'Analytical reagent grade sodium chloride.', 'weight', 'g', 250000.000000000000, 0.850000000000),
+      (${sellerId}, 'SOL-ETH-001', 'Ethanol 99.9%', 'Solvents', 'High purity ethanol for lab usage.', 'volume', 'mL', 500000.000000000000, 1.250000000000),
+      (${sellerId}, 'KIT-PIP-010', 'Sterile Pipette Tips', 'Consumables', 'Box of sterile universal pipette tips.', 'count', 'unit', 10000.000000000000, 2.750000000000),
+      (${sellerId}, 'CHEM-KI-001', 'Potassium Iodide', 'Reagents', 'Pharma-grade potassium iodide powder.', 'weight', 'g', 75000.000000000000, 4.650000000000)
     `;
+  }
+
+  if (sellerId) {
+    await sql`UPDATE products SET seller_id = ${sellerId} WHERE seller_id IS NULL`;
   }
 }

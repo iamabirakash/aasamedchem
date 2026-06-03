@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { ensureSchema, sql } from "./db";
 import { verifyPassword } from "./passwords";
 
-export type Role = "admin" | "seller";
+export type Role = "admin" | "seller" | "buyer";
 
 export type CurrentUser = {
   id: string;
@@ -47,7 +47,9 @@ export async function getCurrentUser() {
 export async function requireUser(role?: Role) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (role && user.role !== role) redirect(user.role === "admin" ? "/admin" : "/products");
+  if (role && user.role !== role) {
+    redirect(user.role === "admin" ? "/admin" : user.role === "seller" ? "/seller" : "/products");
+  }
   return user;
 }
 

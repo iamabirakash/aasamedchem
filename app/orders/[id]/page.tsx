@@ -12,11 +12,27 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     FROM orders o
     JOIN users u ON u.id = o.user_id
     WHERE o.id = ${id}
-      AND (${user.role} = 'admin' OR o.user_id = ${user.id})
+      AND (
+        ${user.role} = 'admin'
+        OR o.user_id = ${user.id}
+        OR EXISTS (
+          SELECT 1
+          FROM order_items oi
+          JOIN products p ON p.id = oi.product_id
+          WHERE oi.order_id = o.id AND p.seller_id = ${user.id}
+        )
+      )
     LIMIT 1
   `;
   const order = orders[0];
-  const items: Array<Record<string, any>> = await sql`SELECT * FROM order_items WHERE order_id = ${id} ORDER BY product_name`;
+  const items: Array<Record<string, any>> = await sql`
+    SELECT oi.*
+    FROM order_items oi
+    LEFT JOIN products p ON p.id = oi.product_id
+    WHERE oi.order_id = ${id}
+      AND (${user.role} != 'seller' OR p.seller_id = ${user.id})
+    ORDER BY product_name
+  `;
 
   return (
     <main className="shell">

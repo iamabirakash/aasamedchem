@@ -4,10 +4,31 @@ import { requireUser } from "@/lib/auth";
 import { ensureSchema, sql } from "@/lib/db";
 import { formatDecimal, formatInr, unitsForDimension, type Dimension } from "@/lib/units";
 
-export default async function AdminPage() {
+type SearchParams = Promise<{ q?: string }>;
+
+export default async function AdminPage({ searchParams }: { searchParams: SearchParams }) {
   const user = await requireUser("admin");
   await ensureSchema();
-  const products: Array<Record<string, any>> = await sql`SELECT * FROM products ORDER BY is_active DESC, category, name`;
+  const params = await searchParams;
+  const q = params.q ?? "";
+  const products: Array<Record<string, any>> = await sql`
+    SELECT p.*, u.name AS seller_name, u.email AS seller_email
+    FROM products p
+    LEFT JOIN users u ON u.id = p.seller_id
+    WHERE ${q} = ''
+      OR p.name ILIKE ${`%${q}%`}
+      OR p.sku ILIKE ${`%${q}%`}
+      OR p.category ILIKE ${`%${q}%`}
+      OR u.name ILIKE ${`%${q}%`}
+      OR u.email ILIKE ${`%${q}%`}
+    ORDER BY p.is_active DESC, p.category, p.name
+  `;
+  const sellers: Array<Record<string, any>> = await sql`
+    SELECT id, name, email
+    FROM users
+    WHERE role = 'seller'
+    ORDER BY name
+  `;
   const summary: Array<Record<string, any>> = await sql`
     SELECT
       COUNT(*)::int AS products,
@@ -21,11 +42,8 @@ export default async function AdminPage() {
       <Nav user={user} />
       <section className="hero">
         <span className="pill">Admin panel</span>
-        <h1>Inventory control with explicit base units.</h1>
-        <p>
-          Product quantities are stored in g, mL, or unit. Sellers can quote compatible display units while
-          admins see the normalized math.
-        </p>
+        <h1>Search, inspect, and edit everything.</h1>
+        <p>Admins can see all sellers, all product listings, all stock/rate data, and all buyer orders.</p>
       </section>
 
       <section className="grid three">
@@ -44,12 +62,20 @@ export default async function AdminPage() {
       </section>
 
       <section className="card stack" style={{ marginTop: 18 }}>
-        <h2>Create product</h2>
-        <ProductForm />
+        <h2>Create product for any seller</h2>
+        <ProductForm sellers={sellers} />
       </section>
 
+      <form className="card form-grid" action="/admin" style={{ marginTop: 18 }}>
+        <label>
+          Admin search
+          <input name="q" defaultValue={q} placeholder="Product, SKU, category, seller..." />
+        </label>
+        <button type="submit">Search anything</button>
+      </form>
+
       <section className="card table-wrap" style={{ marginTop: 18 }}>
-        <h2>Products</h2>
+        <h2>All products</h2>
         <table>
           <thead>
             <tr>
@@ -58,7 +84,7 @@ export default async function AdminPage() {
               <th>Inventory</th>
               <th>Rate</th>
               <th>Status</th>
-              <th>Deactivate</th>
+              <th>Edit / Deactivate</th>
             </tr>
           </thead>
           <tbody>
@@ -68,6 +94,8 @@ export default async function AdminPage() {
                   <strong>{product.name}</strong>
                   <br />
                   <span className="muted">{product.sku} · {product.category}</span>
+                  <br />
+                  <span className="muted">Seller: {product.seller_name ?? "Unassigned"} ({product.seller_email ?? "—"})</span>
                 </td>
                 <td>
                   {product.dimension}
@@ -82,6 +110,12 @@ export default async function AdminPage() {
                     <input name="id" type="hidden" value={product.id} />
                     <button className="danger" type="submit">Deactivate</button>
                   </form>
+                  <details style={{ marginTop: 10 }}>
+                    <summary className="button ghost">Edit product</summary>
+                    <div style={{ marginTop: 12 }}>
+                      <ProductForm sellers={sellers} product={product} />
+                    </div>
+                  </details>
                 </td>
               </tr>
             ))}
@@ -92,45 +126,35 @@ export default async function AdminPage() {
   );
 }
 
-function ProductForm() {
+function ProductForm({ sellers, product }: { sellers: Array<Record<string, any>>; product?: Record<string, any> }) {
   return (
     <form className="form-grid" action={saveProductAction}>
+      {product && <input name="id" type="hidden" value={product.id} />}
       <label>
-        SKU
-        <input name="sku" placeholder="CHEM-ABC-001" required />
+        Seller
+        <select name="seller_id" defaultValue={product?.seller_id ?? sellers[0]?.id ?? ""} required>
+          {sellers.map((seller) => (
+            <option key={seller.id} value={seller.id}>
+              {seller.name} ({seller.email})
+            </option>
+          ))}
+        </select>
       </label>
-      <label>
-        Name
-        <input name="name" placeholder="Product name" required />
-      </label>
-      <label>
-        Category
-        <input name="category" placeholder="Reagents" required />
-      </label>
+      <label>SKU<input name="sku" defaultValue={product?.sku ?? ""} placeholder="CHEM-ABC-001" required /></label>
+      <label>Name<input name="name" defaultValue={product?.name ?? ""} placeholder="Product name" required /></label>
+      <label>Category<input name="category" defaultValue={product?.category ?? ""} placeholder="Reagents" required /></label>
       <label>
         Dimension
-        <select name="dimension" defaultValue="weight">
+        <select name="dimension" defaultValue={product?.dimension ?? "weight"}>
           <option value="weight">Weight (base g)</option>
           <option value="volume">Volume (base mL)</option>
           <option value="count">Count (base unit)</option>
         </select>
       </label>
-      <label>
-        Inventory in base unit
-        <input name="inventory_base_qty" type="number" min="0" step="any" placeholder="1000.000000000001" required />
-      </label>
-      <label>
-        Price / base unit INR
-        <input name="price_per_base_unit_inr" type="number" min="0" step="any" placeholder="1.25" required />
-      </label>
-      <label>
-        Description
-        <textarea name="description" rows={2} placeholder="Short product details" />
-      </label>
-      <label>
-        Active
-        <input name="is_active" type="checkbox" defaultChecked />
-      </label>
+      <label>Inventory in base unit<input name="inventory_base_qty" defaultValue={product?.inventory_base_qty ?? ""} type="number" min="0" step="any" required /></label>
+      <label>Price / base unit INR<input name="price_per_base_unit_inr" defaultValue={product?.price_per_base_unit_inr ?? ""} type="number" min="0" step="any" required /></label>
+      <label>Description<textarea name="description" defaultValue={product?.description ?? ""} rows={2} /></label>
+      <label>Active<input name="is_active" type="checkbox" defaultChecked={product?.is_active ?? true} /></label>
       <button type="submit">Save product</button>
     </form>
   );

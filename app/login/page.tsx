@@ -7,21 +7,23 @@ export default function LoginPage() {
         <div>
           <span className="pill">Secure demo login</span>
           <h1>AasaMedChem</h1>
-          <p className="muted">Use the seeded admin or seller account to explore each role.</p>
+          <p className="muted">Use the seeded buyer, seller, or admin account to explore each role.</p>
         </div>
         <label>
           Email
-          <input name="email" type="email" defaultValue="seller@aasamedchem.test" required />
+          <input name="email" type="email" defaultValue="buyer@aasamedchem.test" required />
         </label>
         <label>
           Password
-          <input name="password" type="password" defaultValue="Seller@123" required />
+          <input name="password" type="password" defaultValue="Buyer@123" required />
         </label>
         <button type="submit">Login</button>
         <p className="muted">
           Admin: admin@aasamedchem.test / Admin@123
           <br />
           Seller: seller@aasamedchem.test / Seller@123
+          <br />
+          Buyer: buyer@aasamedchem.test / Buyer@123
         </p>
       </form>
     </main>
