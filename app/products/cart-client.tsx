@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { placeOrderAction } from "@/app/actions";
 import { formatDecimal, formatInr, unitsForDimension, toBaseQuantity, fromBaseQuantity, type Dimension, type Unit } from "@/lib/units";
 
-type Product = {
+export type Product = {
   id: string;
   name: string;
   sku: string;

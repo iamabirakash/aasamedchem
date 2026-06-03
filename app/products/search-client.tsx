@@ -2,20 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { requestProductAction } from "@/app/actions";
-import { ProductCart } from "@/app/products/cart-client";
-
-type Product = {
-  id: string;
-  name: string;
-  sku: string;
-  category: string;
-  description: string;
-  dimension: string;
-  base_unit: string;
-  inventory_base_qty: string;
-  price_per_base_unit_inr: string;
-  seller_name?: string;
-};
+import { ProductCart, type Product } from "@/app/products/cart-client";
 
 export function SearchClient({
   initialProducts,
