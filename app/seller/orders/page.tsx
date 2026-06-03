@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { updateOrderStatusAction } from "@/app/actions";
 import { Nav } from "@/app/nav";
 import { requireUser } from "@/lib/auth";
 import { ensureSchema, sql } from "@/lib/db";
@@ -30,7 +31,7 @@ export default async function SellerOrdersPage() {
       <section className="hero">
         <span className="pill">Seller panel</span>
         <h1>Sales requests for your products.</h1>
-        <p>See buyer demand, requested units, normalized base quantities, and INR totals.</p>
+        <p>Update order status, set delivery estimates, and audit requested/base quantities.</p>
       </section>
       <section className="grid">
         {orders.map((order) => (
@@ -39,7 +40,10 @@ export default async function SellerOrdersPage() {
               <div>
                 <span className="pill">{order.status}</span>
                 <h2>{formatInr(order.total_inr)}</h2>
-                <p className="muted">{order.buyer_name} · {order.buyer_email}</p>
+                <p className="muted">
+                  {order.buyer_name} · {order.buyer_email}
+                  {order.delivery_estimate_date ? ` · Delivery by ${new Date(order.delivery_estimate_date).toLocaleDateString("en-IN")}` : ""}
+                </p>
               </div>
               <Link className="button ghost" href={`/orders/${order.id}`}>Open</Link>
             </div>
@@ -60,6 +64,23 @@ export default async function SellerOrdersPage() {
                 </tbody>
               </table>
             </div>
+            <form className="form-grid" action={updateOrderStatusAction}>
+              <input name="id" type="hidden" value={order.id} />
+              <label>
+                Status
+                <select name="status" defaultValue={order.status}>
+                  <option value="pending">pending</option>
+                  <option value="approved">approved</option>
+                  <option value="rejected">rejected</option>
+                  <option value="fulfilled">fulfilled</option>
+                </select>
+              </label>
+              <label>
+                Delivery estimate
+                <input name="delivery_estimate_date" type="date" defaultValue={order.delivery_estimate_date ? new Date(order.delivery_estimate_date).toISOString().slice(0, 10) : ""} />
+              </label>
+              <button type="submit">Update order</button>
+            </form>
           </article>
         ))}
       </section>

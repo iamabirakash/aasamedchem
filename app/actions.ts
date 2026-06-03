@@ -88,28 +88,53 @@ export async function saveProductAction(formData: FormData) {
   redirect(user.role === "admin" ? "/admin" : "/seller");
 }
 
-export async function deleteProductAction(formData: FormData) {
+export async function toggleProductActiveAction(formData: FormData) {
   const user = await requireUser();
   await ensureSchema();
   if (!["admin", "seller"].includes(user.role)) {
-    throw new Error("Only sellers and admins can deactivate products");
+    throw new Error("Only sellers and admins can update product status");
   }
   const id = String(formData.get("id") ?? "");
+  const nextIsActive = String(formData.get("is_active") ?? "false") === "true";
   await sql`
     UPDATE products
-    SET is_active = false, updated_at = now()
+    SET is_active = ${nextIsActive}, updated_at = now()
     WHERE id = ${id}
       AND (${user.role} = 'admin' OR seller_id = ${user.id})
   `;
   revalidatePath("/admin");
   revalidatePath("/seller");
+  revalidatePath("/products");
 }
 
 export async function updateOrderStatusAction(formData: FormData) {
-  await requireUser("admin");
+  const user = await requireUser();
   await ensureSchema();
-  await sql`UPDATE orders SET status = ${String(formData.get("status"))} WHERE id = ${String(formData.get("id"))}`;
+  if (!["admin", "seller"].includes(user.role)) {
+    throw new Error("Only admins and sellers can update order status");
+  }
+  const orderId = String(formData.get("id"));
+  const status = String(formData.get("status"));
+  const deliveryEstimateDate = String(formData.get("delivery_estimate_date") ?? "") || null;
+
+  await sql`
+    UPDATE orders
+    SET status = ${status},
+        delivery_estimate_date = ${deliveryEstimateDate}
+    WHERE id = ${orderId}
+      AND (
+        ${user.role} = 'admin'
+        OR EXISTS (
+          SELECT 1
+          FROM order_items oi
+          JOIN products p ON p.id = oi.product_id
+          WHERE oi.order_id = orders.id AND p.seller_id = ${user.id}
+        )
+      )
+  `;
   revalidatePath("/admin/orders");
+  revalidatePath("/seller/orders");
+  revalidatePath(`/orders/${orderId}`);
 }
 
 export async function placeOrderAction(formData: FormData) {

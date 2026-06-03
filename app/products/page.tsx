@@ -1,8 +1,7 @@
-import { placeOrderAction } from "@/app/actions";
 import { Nav } from "@/app/nav";
+import { ProductCart } from "@/app/products/cart-client";
 import { requireUser } from "@/lib/auth";
 import { ensureSchema, sql } from "@/lib/db";
-import { formatDecimal, formatInr, unitsForDimension, type Dimension } from "@/lib/units";
 
 type SearchParams = Promise<{ q?: string; category?: string }>;
 
@@ -29,17 +28,14 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
       <Nav user={user} />
       <section className="hero">
         <span className="pill">Buyer panel</span>
-        <h1>Search products and buy from sellers.</h1>
-        <p>
-          Select products, enter quantities in compatible units, and submit. Each line stores both requested
-          units and normalized base quantities.
-        </p>
+        <h1>Search products, add to cart, then order.</h1>
+        <p>No checkbox juggling. Add products to cart, set quantity and unit in one place, then submit.</p>
       </section>
 
       <form className="card form-grid" action="/products">
         <label>
           Search
-          <input name="q" defaultValue={q} placeholder="SKU, chemical, category..." />
+          <input name="q" defaultValue={q} placeholder="SKU, chemical, category, seller..." />
         </label>
         <label>
           Category
@@ -55,47 +51,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
         <button type="submit">Filter</button>
       </form>
 
-      <form className="stack" action={placeOrderAction} style={{ marginTop: 18 }}>
-        {products.map((product) => {
-          const dimension = product.dimension as Dimension;
-          const units = unitsForDimension(dimension);
-          return (
-            <article className="card product-row" key={product.id}>
-              <input name="product_id" type="checkbox" value={product.id} />
-              <div>
-                <span className="pill">{product.category}</span>
-                <h3>{product.name}</h3>
-                <p className="muted">
-                  Seller {product.seller_name ?? "Unassigned"} · {product.sku} · Stock {formatDecimal(product.inventory_base_qty)} {product.base_unit} · Rate{" "}
-                  {formatInr(product.price_per_base_unit_inr)} / {product.base_unit}
-                </p>
-                <p className="muted">{product.description}</p>
-              </div>
-              <label>
-                Quantity
-                <input name={`qty_${product.id}`} min="0" step="any" placeholder="0" />
-              </label>
-              <label>
-                Unit
-                <select name={`unit_${product.id}`}>
-                  {units.map((unit) => (
-                    <option key={unit} value={unit}>
-                      {unit}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </article>
-          );
-        })}
-        <section className="card stack">
-          <label>
-            Notes
-            <textarea name="notes" rows={3} placeholder="Delivery preference, batch requirements, etc." />
-          </label>
-          <button type="submit">Place quotation</button>
-        </section>
-      </form>
+      <ProductCart products={products as any} />
     </main>
   );
 }

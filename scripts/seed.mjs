@@ -85,10 +85,13 @@ async function main() {
       user_id UUID NOT NULL REFERENCES users(id),
       status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'fulfilled')),
       total_inr NUMERIC(30,12) NOT NULL DEFAULT 0,
+      delivery_estimate_date DATE,
       notes TEXT NOT NULL DEFAULT '',
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `;
+
+  await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_estimate_date DATE`;
 
   await sql`
     CREATE TABLE IF NOT EXISTS order_items (

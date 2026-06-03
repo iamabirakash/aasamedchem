@@ -1,4 +1,4 @@
-import { deleteProductAction, saveProductAction } from "@/app/actions";
+import { saveProductAction, toggleProductActiveAction } from "@/app/actions";
 import { Nav } from "@/app/nav";
 import { requireUser } from "@/lib/auth";
 import { ensureSchema, sql } from "@/lib/db";
@@ -54,9 +54,12 @@ export default async function SellerPage() {
                 <td>{formatInr(product.price_per_base_unit_inr)} / {product.base_unit}</td>
                 <td><span className="pill">{product.is_active ? "active" : "inactive"}</span></td>
                 <td>
-                  <form action={deleteProductAction}>
+                  <form action={toggleProductActiveAction}>
                     <input name="id" type="hidden" value={product.id} />
-                    <button className="danger" type="submit">Deactivate</button>
+                    <input name="is_active" type="hidden" value={product.is_active ? "false" : "true"} />
+                    <button className={product.is_active ? "danger" : ""} type="submit">
+                      {product.is_active ? "Deactivate" : "Activate"}
+                    </button>
                   </form>
                 </td>
               </tr>
