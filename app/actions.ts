@@ -6,6 +6,7 @@ import { login, logout, requireUser } from "@/lib/auth";
 import { ensureSchema, sql } from "@/lib/db";
 import { isPositive, multiplyByInteger, multiplyScaled, parseDecimalToScaled, scaledToDecimal } from "@/lib/decimal";
 import { baseUnitForDimension, type Dimension, type Unit } from "@/lib/units";
+import { hashPassword } from "@/lib/passwords";
 
 const unitFactor: Record<Unit, bigint> = {
   g: 1n,
@@ -25,6 +26,58 @@ export async function loginAction(formData: FormData) {
 export async function logoutAction() {
   await logout();
   redirect("/login");
+}
+
+export async function signupAction(formData: FormData) {
+  const name = String(formData.get("name") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const password = String(formData.get("password") ?? "");
+  const confirmPassword = String(formData.get("confirmPassword") ?? "");
+  const role = String(formData.get("role") ?? "").toLowerCase();
+
+  // Validation
+  if (!name) {
+    throw new Error("Name is required");
+  }
+  if (!email) {
+    throw new Error("Email is required");
+  }
+  if (!password) {
+    throw new Error("Password is required");
+  }
+  if (password !== confirmPassword) {
+    throw new Error("Passwords do not match");
+  }
+  if (password.length < 8) {
+    throw new Error("Password must be at least 8 characters long");
+  }
+  if (!["buyer", "seller"].includes(role)) {
+    throw new Error("Invalid role. Only buyer or seller allowed");
+  }
+
+  await ensureSchema();
+
+  // Check if email already exists
+  const existingUser = await sql`
+    SELECT id FROM users WHERE lower(email) = ${email}
+  `;
+  if (existingUser.length > 0) {
+    throw new Error("Email already registered");
+  }
+
+  // Create new user
+  const passwordHash = hashPassword(password);
+  const result = await sql`
+    INSERT INTO users (name, email, password_hash, role)
+    VALUES (${name}, ${email}, ${passwordHash}, ${role})
+    RETURNING id
+  `;
+
+  const userId = result[0].id;
+
+  // Log the user in
+  const user = await login(email, password);
+  redirect(user.role === "seller" ? "/seller" : "/products");
 }
 
 export async function saveProductAction(formData: FormData) {

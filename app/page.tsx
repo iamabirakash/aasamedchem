@@ -79,6 +79,23 @@ export default async function HomePage() {
           >
             Login
           </Link>
+          <Link
+            href="/signup"
+            style={{
+              fontFamily: "'DM Mono', monospace",
+              fontSize: "12px",
+              letterSpacing: ".08em",
+              textTransform: "uppercase",
+              padding: "12px 28px",
+              background: "transparent",
+              color: "#1a1a1a",
+              border: "0.5px solid #888780",
+              borderRadius: "2px",
+              textDecoration: "none",
+            }}
+          >
+            Signup
+          </Link>
         </div>
       </section>
 

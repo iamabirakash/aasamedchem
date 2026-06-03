@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { loginAction } from "@/app/actions";
 
 export default function LoginPage() {
@@ -24,6 +25,13 @@ export default function LoginPage() {
           Seller: seller@aasamedchem.test / Seller@123
           <br />
           Buyer: buyer@aasamedchem.test / Buyer@123
+        </p>
+        <hr />
+        <p className="muted center">
+          Don't have an account?{" "}
+          <Link href="/signup" className="link">
+            Sign up here
+          </Link>
         </p>
       </form>
     </main>
