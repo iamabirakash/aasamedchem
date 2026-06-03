@@ -41,9 +41,6 @@ export async function ensureSchema() {
     )
   `;
 
-  await sql`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check`;
-  await sql`ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('admin', 'seller', 'buyer'))`;
-
   await sql`
     CREATE TABLE IF NOT EXISTS products (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

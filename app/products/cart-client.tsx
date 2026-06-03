@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { placeOrderAction } from "@/app/actions";
-import { formatDecimal, formatInr, unitsForDimension, type Dimension, type Unit } from "@/lib/units";
+import { formatDecimal, formatInr, unitsForDimension, toBaseQuantity, fromBaseQuantity, type Dimension, type Unit } from "@/lib/units";
 
 type Product = {
   id: string;
@@ -23,8 +23,25 @@ type CartLine = {
   unit: Unit;
 };
 
+function calculatePrice(quantity: string, unit: Unit, product: Product): string {
+  const qty = parseFloat(quantity);
+  if (!qty || qty <= 0) return "0";
+  
+  const baseQuantity = toBaseQuantity(qty, unit, product.dimension);
+  const pricePerBaseUnit = parseFloat(product.price_per_base_unit_inr);
+  const totalPrice = (baseQuantity * pricePerBaseUnit).toString();
+  return totalPrice;
+}
+
+function getAvailableInUnit(inventoryBaseQty: string, unit: Unit, dimension: Dimension): string {
+  const baseQty = parseFloat(inventoryBaseQty);
+  const availableInUnit = fromBaseQuantity(baseQty, unit, dimension);
+  return availableInUnit.toString();
+}
+
 export function ProductCart({ products }: { products: Product[] }) {
   const [cart, setCart] = useState<Record<string, CartLine>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const lines = useMemo(() => Object.values(cart), [cart]);
 
@@ -44,18 +61,67 @@ export function ProductCart({ products }: { products: Product[] }) {
     setCart((current) => {
       const existing = current[productId];
       if (!existing) return current;
+      
+      const updated = {
+        ...existing,
+        ...patch
+      };
+
+      // Validation: check if quantity exceeds available inventory
+      const newQuantity = patch.quantity ?? existing.quantity;
+      const newUnit = patch.unit ?? existing.unit;
+      const qtyNum = parseFloat(newQuantity);
+
+      // Only validate if quantity is a valid positive number (skip validation while user is typing)
+      if (qtyNum > 0 && Number.isFinite(qtyNum)) {
+        try {
+          const baseQuantity = toBaseQuantity(qtyNum, newUnit, updated.product.dimension);
+          const availableBaseQty = parseFloat(updated.product.inventory_base_qty);
+
+          if (baseQuantity > availableBaseQty) {
+            const available = getAvailableInUnit(updated.product.inventory_base_qty, newUnit, updated.product.dimension);
+            setErrors((current) => ({
+              ...current,
+              [productId]: `Only ${formatDecimal(available)} ${newUnit} available`
+            }));
+          } else {
+            setErrors((current) => {
+              const next = { ...current };
+              delete next[productId];
+              return next;
+            });
+          }
+        } catch (err) {
+          // If validation fails, clear the error to allow user to continue typing
+          setErrors((current) => {
+            const next = { ...current };
+            delete next[productId];
+            return next;
+          });
+        }
+      } else {
+        // For invalid/partial inputs, clear errors to allow typing
+        setErrors((current) => {
+          const next = { ...current };
+          delete next[productId];
+          return next;
+        });
+      }
+
       return {
         ...current,
-        [productId]: {
-          ...existing,
-          ...patch
-        }
+        [productId]: updated
       };
     });
   }
 
   function removeLine(productId: string) {
     setCart((current) => {
+      const next = { ...current };
+      delete next[productId];
+      return next;
+    });
+    setErrors((current) => {
       const next = { ...current };
       delete next[productId];
       return next;
@@ -94,8 +160,11 @@ export function ProductCart({ products }: { products: Product[] }) {
           <form className="stack" action={placeOrderAction}>
             {lines.map((line) => {
               const units = unitsForDimension(line.product.dimension);
+              const price = calculatePrice(line.quantity, line.unit, line.product);
+              const error = errors[line.product.id];
+              const availableInUnit = getAvailableInUnit(line.product.inventory_base_qty, line.unit, line.product.dimension);
               return (
-                <article className="card stack" key={line.product.id} style={{ boxShadow: "none" }}>
+                <article className="card stack" key={line.product.id} style={{ boxShadow: "none", borderColor: error ? "var(--danger)" : undefined }}>
                   <input name="product_id" type="hidden" value={line.product.id} />
                   <strong>{line.product.name}</strong>
                   <span className="muted">{formatInr(line.product.price_per_base_unit_inr)} / {line.product.base_unit}</span>
@@ -125,6 +194,17 @@ export function ProductCart({ products }: { products: Product[] }) {
                       </select>
                     </label>
                   </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <p className="muted" style={{ margin: "4px 0" }}>
+                        Available: {formatDecimal(availableInUnit)} {line.unit}
+                      </p>
+                      <p style={{ margin: "4px 0", fontSize: "1rem", fontWeight: 600 }}>
+                        Total: {formatInr(price)}
+                      </p>
+                      {error && <p style={{ margin: "4px 0", color: "var(--danger)", fontSize: "0.9rem" }}>⚠️ {error}</p>}
+                    </div>
+                  </div>
                   <button className="ghost" type="button" onClick={() => removeLine(line.product.id)}>
                     Remove
                   </button>
@@ -135,7 +215,13 @@ export function ProductCart({ products }: { products: Product[] }) {
               Notes
               <textarea name="notes" rows={3} placeholder="Delivery preference, batch requirements, etc." />
             </label>
-            <button type="submit">Place order</button>
+            <button 
+              type="submit" 
+              disabled={Object.keys(errors).length > 0}
+              style={{ opacity: Object.keys(errors).length > 0 ? 0.5 : 1, cursor: Object.keys(errors).length > 0 ? "not-allowed" : "pointer" }}
+            >
+              {Object.keys(errors).length > 0 ? "Fix quantity errors to proceed" : "Place order"}
+            </button>
           </form>
         )}
       </aside>
