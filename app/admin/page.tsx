@@ -40,33 +40,37 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
   return (
     <main className="shell">
       <Nav user={user} />
+
       <section className="hero">
         <span className="pill">Admin panel</span>
         <h1>Search, inspect, and edit everything.</h1>
         <p>Admins can see all sellers, all product listings, all stock/rate data, and all buyer orders.</p>
       </section>
 
+      {/* Summary stats */}
       <section className="grid three">
         <article className="card">
-          <h3>{summary[0].active_products}</h3>
-          <p className="muted">Active products</p>
+          <p className="muted" style={{ margin: "0 0 6px", fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.06em" }}>Active products</p>
+          <h3 style={{ margin: 0, fontFamily: "'Syne', sans-serif", fontSize: "2rem", fontWeight: 800, letterSpacing: "-0.03em" }}>{summary[0].active_products}</h3>
         </article>
         <article className="card">
-          <h3>{summary[0].products}</h3>
-          <p className="muted">Total product records</p>
+          <p className="muted" style={{ margin: "0 0 6px", fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.06em" }}>Total product records</p>
+          <h3 style={{ margin: 0, fontFamily: "'Syne', sans-serif", fontSize: "2rem", fontWeight: 800, letterSpacing: "-0.03em" }}>{summary[0].products}</h3>
         </article>
         <article className="card">
-          <h3>{formatInr(summary[0].stock_value)}</h3>
-          <p className="muted">Estimated inventory value</p>
+          <p className="muted" style={{ margin: "0 0 6px", fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.06em" }}>Estimated inventory value</p>
+          <h3 style={{ margin: 0, fontFamily: "'Syne', sans-serif", fontSize: "2rem", fontWeight: 800, letterSpacing: "-0.03em", color: "var(--accent)" }}>{formatInr(summary[0].stock_value)}</h3>
         </article>
       </section>
 
-      <section className="card stack" style={{ marginTop: 18 }}>
+      {/* Create product */}
+      <section className="card stack" style={{ marginTop: 16 }}>
         <h2>Create product for any seller</h2>
         <ProductForm sellers={sellers} />
       </section>
 
-      <form className="card form-grid" action="/admin" style={{ marginTop: 18 }}>
+      {/* Search */}
+      <form className="card form-grid" action="/admin" style={{ marginTop: 16 }}>
         <label>
           Admin search
           <input name="q" defaultValue={q} placeholder="Product, SKU, category, seller..." />
@@ -74,7 +78,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
         <button type="submit">Search anything</button>
       </form>
 
-      <section className="card table-wrap" style={{ marginTop: 18 }}>
+      {/* All products table */}
+      <section className="card table-wrap" style={{ marginTop: 16 }}>
         <h2>All products</h2>
         <table>
           <thead>
@@ -91,21 +96,37 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
             {products.map((product) => (
               <tr key={product.id}>
                 <td>
-                  <strong>{product.name}</strong>
+                  <strong style={{ fontWeight: 500 }}>{product.name}</strong>
                   <br />
-                  <span className="muted">{product.sku} · {product.category}</span>
+                  <span className="muted" style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.72rem" }}>
+                    {product.sku} · {product.category}
+                  </span>
                   <br />
-                  <span className="muted">Seller: {product.seller_name ?? "Unassigned"} ({product.seller_email ?? "—"})</span>
+                  <span className="muted" style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.72rem" }}>
+                    Seller: {product.seller_name ?? "Unassigned"} ({product.seller_email ?? "—"})
+                  </span>
                 </td>
                 <td>
-                  {product.dimension}
+                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.82rem" }}>{product.dimension}</span>
                   <br />
-                  <span className="muted">Allowed: {unitsForDimension(product.dimension as Dimension).join(", ")}</span>
+                  <span className="muted" style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.7rem" }}>
+                    {unitsForDimension(product.dimension as Dimension).join(", ")}
+                  </span>
                 </td>
-                <td>{formatDecimal(product.inventory_base_qty)} {product.base_unit}</td>
-                <td>{formatInr(product.price_per_base_unit_inr)} / {product.base_unit}</td>
-                <td><span className="pill">{product.is_active ? "active" : "inactive"}</span></td>
+                <td style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.85rem" }}>
+                  {formatDecimal(product.inventory_base_qty)}{" "}
+                  <span style={{ color: "var(--ink-3)" }}>{product.base_unit}</span>
+                </td>
+                <td style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.85rem" }}>
+                  <span style={{ color: "var(--accent)" }}>{formatInr(product.price_per_base_unit_inr)}</span>
+                  <span style={{ color: "var(--ink-3)" }}> / {product.base_unit}</span>
+                </td>
                 <td>
+                  <span className="pill" data-status={product.is_active ? "active" : "inactive"}>
+                    {product.is_active ? "active" : "inactive"}
+                  </span>
+                </td>
+                <td style={{ verticalAlign: "top" }}>
                   <form action={toggleProductActiveAction}>
                     <input name="id" type="hidden" value={product.id} />
                     <input name="is_active" type="hidden" value={product.is_active ? "false" : "true"} />

@@ -24,6 +24,7 @@ export default async function AdminOrdersPage() {
   return (
     <main className="shell">
       <Nav user={user} />
+
       <section className="hero">
         <span className="pill">Admin panel</span>
         <h1>Incoming quotations and conversion audit.</h1>
@@ -33,17 +34,34 @@ export default async function AdminOrdersPage() {
       <section className="grid">
         {orders.map((order) => (
           <article className="card stack" key={order.id}>
-            <div className="row-actions" style={{ justifyContent: "space-between" }}>
-              <div>
-                <span className="pill">{order.status}</span>
-                <h2>{formatInr(order.total_inr)}</h2>
-                <p className="muted">
+
+            {/* Order header */}
+            <div className="row-actions" style={{ justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div style={{ display: "grid", gap: 6 }}>
+                <span className="pill" data-status={order.status}>{order.status}</span>
+                <p style={{
+                  fontFamily: "'Syne', sans-serif",
+                  fontWeight: 800,
+                  fontSize: "1.4rem",
+                  margin: 0,
+                  color: "var(--accent)",
+                  letterSpacing: "-0.02em",
+                }}>
+                  {formatInr(order.total_inr)}
+                </p>
+                <p className="muted" style={{ margin: 0, fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.72rem" }}>
                   {order.user_name} · {order.user_email} · {new Date(order.created_at).toLocaleString("en-IN")}
                 </p>
               </div>
-              <Link className="button ghost" href={`/orders/${order.id}`}>Open details</Link>
+              <Link className="button ghost" href={`/orders/${order.id}`}>Open details ↗</Link>
             </div>
-            <div className="table-wrap">
+
+            {/* Line items table */}
+            <div className="table-wrap" style={{
+              border: "1px solid var(--line)",
+              borderRadius: "var(--radius-md)",
+              overflow: "hidden",
+            }}>
               <table>
                 <thead>
                   <tr>
@@ -57,26 +75,51 @@ export default async function AdminOrdersPage() {
                 <tbody>
                   {items.filter((item) => item.parent_order_id === order.id).map((item) => (
                     <tr key={item.id}>
-                      <td>{item.product_name}<br /><span className="muted">{item.sku}</span></td>
-                      <td>{formatDecimal(item.requested_qty)} {item.requested_unit}</td>
-                      <td>{formatDecimal(item.base_qty)} {item.base_unit}</td>
-                      <td>{formatInr(item.unit_price_inr)} / {item.base_unit}</td>
-                      <td>{formatInr(item.line_total_inr)}</td>
+                      <td>
+                        <span style={{ fontWeight: 500 }}>{item.product_name}</span>
+                        <br />
+                        <span className="muted" style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.7rem" }}>{item.sku}</span>
+                      </td>
+                      <td style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.82rem" }}>
+                        {formatDecimal(item.requested_qty)}{" "}
+                        <span style={{ color: "var(--ink-3)" }}>{item.requested_unit}</span>
+                      </td>
+                      <td style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.82rem" }}>
+                        {formatDecimal(item.base_qty)}{" "}
+                        <span style={{ color: "var(--ink-3)" }}>{item.base_unit}</span>
+                      </td>
+                      <td style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.82rem" }}>
+                        <span style={{ color: "var(--accent)" }}>{formatInr(item.unit_price_inr)}</span>
+                        <span style={{ color: "var(--ink-3)" }}> / {item.base_unit}</span>
+                      </td>
+                      <td style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.82rem", color: "var(--accent)" }}>
+                        {formatInr(item.line_total_inr)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <form className="row-actions" action={updateOrderStatusAction}>
+
+            {/* Status update form */}
+            <form className="row-actions" action={updateOrderStatusAction} style={{
+              paddingTop: 14,
+              borderTop: "1px solid var(--line)",
+              alignItems: "end",
+            }}>
               <input name="id" type="hidden" value={order.id} />
-              <select name="status" defaultValue={order.status} style={{ maxWidth: 180 }}>
-                <option value="pending">pending</option>
-                <option value="approved">approved</option>
-                <option value="rejected">rejected</option>
-                <option value="fulfilled">fulfilled</option>
-              </select>
+              <label style={{ flex: 1, maxWidth: 200 }}>
+                Status
+                <select name="status" defaultValue={order.status}>
+                  <option value="pending">pending</option>
+                  <option value="approved">approved</option>
+                  <option value="rejected">rejected</option>
+                  <option value="fulfilled">fulfilled</option>
+                </select>
+              </label>
               <button type="submit">Update status</button>
             </form>
+
           </article>
         ))}
       </section>
