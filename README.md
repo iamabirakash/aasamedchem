@@ -21,6 +21,24 @@ A small inventory, seller listing, buyer ordering, and admin oversight app built
 
 Server Actions validate roles, normalize units, calculate prices, and persist orders/listings in PostgreSQL.
 
+## Directory Structure
+
+- `app/` - Next.js App Router components and pages:
+  - `actions.ts` - Centralized Server Actions handling authentication, product storage, status updates, and order placement.
+  - `admin/` - Admin dashboard (catalog statistics, listings management, quotation audit logs, and buyer product requests).
+  - `seller/` - Seller panel for managing listings, stock active state, and updating order fulfillment statuses.
+  - `products/` - Buyer product page featuring real-time client-side search and cart management.
+  - `orders/` - Buyer quotation list and detailed conversion audit page.
+  - `login/` & `signup/` - User registration and authentication views.
+- `lib/` - Core business logic utilities:
+  - `auth.ts` - Session tokens, cookie management, and authorization routing gates.
+  - `passwords.ts` - Secure PBKDF2 password hashing and verification algorithms.
+  - `db.ts` - Neon database connection initialization and automatic schema generation.
+  - `decimal.ts` - High-precision math utility using BigInt scaled to 12 decimal places.
+  - `units.ts` - Conversion coefficients for weight (g, kg), volume (mL, L), and count (unit).
+- `scripts/` - Database seed tools:
+  - `seed.mjs` - Standalone command-line script to migrate the database schema and populate demo credentials.
+
 ## Database Schema
 
 - `users`
