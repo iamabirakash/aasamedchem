@@ -17,6 +17,9 @@ export function Nav({ user }: { user: CurrentUser }) {
             <Link className="button ghost" href="/admin/orders">
               Orders
             </Link>
+            <Link className="button ghost" href="/admin/product-requests">
+              Requests
+            </Link>
           </>
         ) : user.role === "seller" ? (
           <>

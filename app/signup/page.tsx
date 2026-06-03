@@ -54,6 +54,13 @@ export default function SignupPage() {
             Login here
           </Link>
         </p>
+        <hr />
+        <p className="muted center">
+          Go back to Home{" "}
+          <Link href="/" className="link">
+            Home
+          </Link>
+        </p>
       </form>
     </main>
   );

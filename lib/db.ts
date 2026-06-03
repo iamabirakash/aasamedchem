@@ -91,6 +91,18 @@ export async function ensureSchema() {
     )
   `;
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS product_requests (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      buyer_id UUID NOT NULL REFERENCES users(id),
+      product_name TEXT NOT NULL,
+      category TEXT,
+      description TEXT,
+      status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'acknowledged', 'rejected')),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+
   await seedIfEmpty();
   schemaReady = true;
 }

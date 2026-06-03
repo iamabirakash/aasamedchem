@@ -33,6 +33,12 @@ export default function LoginPage() {
             Sign up here
           </Link>
         </p>
+        <p className="muted center">
+          Go back to Home{" "}
+          <Link href="/" className="link">
+            Home
+          </Link>
+        </p>
       </form>
     </main>
   );

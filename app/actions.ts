@@ -80,6 +80,26 @@ export async function signupAction(formData: FormData) {
   redirect(user.role === "seller" ? "/seller" : "/products");
 }
 
+export async function requestProductAction(formData: FormData) {
+  const user = await requireUser("buyer");
+  await ensureSchema();
+  
+  const productName = String(formData.get("product_name") ?? "").trim();
+  const category = String(formData.get("category") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim();
+  
+  if (!productName) {
+    throw new Error("Product name is required");
+  }
+  
+  await sql`
+    INSERT INTO product_requests (buyer_id, product_name, category, description)
+    VALUES (${user.id}, ${productName}, ${category || null}, ${description || null})
+  `;
+  
+  revalidatePath("/products");
+}
+
 export async function saveProductAction(formData: FormData) {
   const user = await requireUser();
   await ensureSchema();
